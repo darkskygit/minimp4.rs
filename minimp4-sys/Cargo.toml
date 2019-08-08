@@ -1,0 +1,9 @@
+[package]
+name = "minimp4-sys"
+version = "0.1.0"
+authors = ["DarkSky"]
+edition = "2018"
+
+[build-dependencies]
+bindgen = "0.51.0"
+cc = "1.0.38"
