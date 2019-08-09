@@ -23,7 +23,7 @@ static void write_callback(int64_t offset, const void *buffer, size_t size, void
     fwrite(buffer, size, 1, f);
 }
 
-int write_mp4(char* output, int width, int height, int fps, const void *data, size_t data_size)
+int write_mp4(char* output, int width, int height, int fps, const uint8_t *data, size_t data_size)
 {
     FILE *fout = fopen(output, "wb");
     if (!fout)
