@@ -23,22 +23,7 @@ static void write_callback(int64_t offset, const void *buffer, size_t size, void
     fwrite(buffer, size, 1, f);
 }
 
-int write_mp4(char* output, int width, int height, int fps, const uint8_t *data, size_t data_size)
-{
-    FILE *fout = fopen(output, "wb");
-    if (!fout)
-    {
-        printf("error: can't open output file\n");
-        return 0;
-    }
-
-    int is_hevc = 0;
-    int sequential_mode = 0;
-    MP4E_mux_t *mux;
-    mp4_h26x_writer_t mp4wr;
-    mux = MP4E__open(sequential_mode, fout, write_callback);
-    mp4_h26x_write_init(&mp4wr, mux, width, height, is_hevc);
-
+void write_mp4(mp4_h26x_writer_t *mp4wr, int fps, const uint8_t *data, size_t data_size) {
     while (data_size > 0)
     {
         size_t nal_size = get_nal_size(data, data_size);
@@ -48,13 +33,8 @@ int write_mp4(char* output, int width, int height, int fps, const uint8_t *data,
             data_size -= 1;
             continue;
         }
-
-        mp4_h26x_write_nal(&mp4wr, data, nal_size, 90000/fps);
+        mp4_h26x_write_nal(mp4wr, data, nal_size, 90000/fps);
         data  += nal_size;
         data_size -= nal_size;
     }
-
-    MP4E__close(mux);
-    if (fout)
-        fclose(fout);
 }

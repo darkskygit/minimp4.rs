@@ -8,7 +8,6 @@ fn main() {
     cc::Build::new()
         .define("NDEBUG", Some("1"))
         .file("minimp4.c")
-        .flag("-utf8")
         .compile("minimp4");
     let bindings = bindgen::Builder::default()
         .header("minimp4/minimp4.h")

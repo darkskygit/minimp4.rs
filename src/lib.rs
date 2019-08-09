@@ -1,32 +1,75 @@
-use minimp4_sys::MP4E__open;
+use libc::malloc;
+use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E__close, MP4E__open, MP4E_mux_t};
+use std::convert::TryInto;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
-use std::os::raw::c_void;
+use std::mem::size_of;
+use std::os::raw::{c_int, c_void};
+use std::ptr::null_mut;
 use std::slice::from_raw_parts;
 
-pub struct Mp4Muxer {
-    buffer: Cursor<Vec<u8>>,
+extern "C" {
+    fn write_mp4(
+        mp4wr: *const mp4_h26x_writer_t,
+        fps: c_int,
+        data: *const c_void,
+        data_size: c_int,
+    );
 }
 
-impl Mp4Muxer {
-    pub fn new() -> Self {
-        Self {
-            buffer: Cursor::new(Vec::new()),
+pub struct Mp4Muxer<W> {
+    writer: W,
+    muxer: *mut MP4E_mux_t,
+    muxer_writer: *mut mp4_h26x_writer_t,
+}
+
+impl<W: Write + Seek> Mp4Muxer<W> {
+    pub fn new(writer: W) -> Self {
+        unsafe {
+            Self {
+                writer,
+                muxer: null_mut(),
+                muxer_writer: malloc(size_of::<mp4_h26x_writer_t>()) as *mut mp4_h26x_writer_t,
+            }
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&mut self, width: i32, height: i32, is_hevc: bool) {
         unsafe {
             let self_ptr = self as *mut Self as *mut c_void;
-            MP4E__open(0, self_ptr, Some(Self::write));
+            self.muxer = MP4E__open(0, self_ptr, Some(Self::write));
+            mp4_h26x_write_init(
+                self.muxer_writer,
+                self.muxer,
+                width,
+                height,
+                if is_hevc { 1 } else { 0 },
+            );
+        }
+    }
+
+    pub fn write_mp4(&self, data: &[u8]) {
+        unsafe {
+            write_mp4(
+                self.muxer_writer,
+                60,
+                data.as_ptr() as *const c_void,
+                data.len().try_into().unwrap(),
+            );
+        }
+    }
+    pub fn close(&self) {
+        unsafe {
+            MP4E__close(self.muxer);
         }
     }
 
     pub fn write_data(&mut self, offset: i64, buf: &[u8]) {
-        self.buffer.set_position(offset as u64);
-        self.buffer.write_all(buf).unwrap();
+        self.writer.seek(SeekFrom::Start(offset as u64)).unwrap();
+        self.writer.write_all(buf).unwrap();
     }
 
     extern "C" fn write(offset: i64, buffer: *const c_void, size: usize, token: *mut c_void) {
+        println!("write, {}, {}", offset, size);
         let p_self = token as *mut Self;
         unsafe {
             let buf = from_raw_parts(buffer as *const u8, size);
