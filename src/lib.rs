@@ -1,5 +1,5 @@
 use libc::malloc;
-use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E__close, MP4E__open, MP4E_mux_t};
+use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E__close, MP4E__open, MP4E_mux_t, MP4E__set_text_comment};
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::io::{Seek, SeekFrom, Write};
@@ -21,7 +21,7 @@ pub struct Mp4Muxer<W> {
     writer: W,
     muxer: *mut MP4E_mux_t,
     muxer_writer: *mut mp4_h26x_writer_t,
-    track_name: Vec<CString>,
+    str_buffer: Vec<CString>,
 }
 
 impl<W: Write + Seek> Mp4Muxer<W> {
@@ -31,25 +31,25 @@ impl<W: Write + Seek> Mp4Muxer<W> {
                 writer,
                 muxer: null_mut(),
                 muxer_writer: malloc(size_of::<mp4_h26x_writer_t>()) as *mut mp4_h26x_writer_t,
-                track_name: Vec::new(),
+                str_buffer: Vec::new(),
             }
         }
     }
 
     pub fn init_video(&mut self, width: i32, height: i32, is_hevc: bool, track_name: &str) {
+        self.str_buffer.push(CString::new(track_name).unwrap());
         unsafe {
             if self.muxer.is_null() {
                 let self_ptr = self as *mut Self as *mut c_void;
                 self.muxer = MP4E__open(0, self_ptr, Some(Self::write));
             }
-            self.track_name.push(CString::new(track_name).unwrap());
             mp4_h26x_write_init(
                 self.muxer_writer,
                 self.muxer,
                 width,
                 height,
                 if is_hevc { 1 } else { 0 },
-                self.track_name.last().unwrap().as_ptr(),
+                self.str_buffer.last().unwrap().as_ptr(),
             );
         }
     }
@@ -64,6 +64,17 @@ impl<W: Write + Seek> Mp4Muxer<W> {
             );
         }
     }
+
+    pub fn write_comment(&mut self, comment: &str) {
+        self.str_buffer.push(CString::new(comment).unwrap());
+        unsafe {
+            MP4E__set_text_comment(
+                self.muxer,
+                self.str_buffer.last().unwrap().as_ptr(),
+            );
+        }
+    }
+    
     pub fn close(&self) {
         unsafe {
             MP4E__close(self.muxer);

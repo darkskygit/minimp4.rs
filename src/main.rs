@@ -18,5 +18,6 @@ fn main() {
     mp4muxer.write_video(&buf);
     mp4muxer.init_video(1920, 1200, false, "test5");
     mp4muxer.write_video(&buf);
+    mp4muxer.write_comment("test comment\n");
     mp4muxer.close();
 }
