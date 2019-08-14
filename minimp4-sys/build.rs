@@ -10,7 +10,7 @@ fn main() {
         .file("minimp4.c")
         .compile("minimp4");
     let bindings = bindgen::Builder::default()
-        .header("minimp4/minimp4.h")
+        .header("minimp4.h")
         .generate()
         .expect("Unable to generate bindings");
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());

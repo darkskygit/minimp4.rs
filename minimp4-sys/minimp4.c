@@ -1,6 +1,9 @@
 #define MINIMP4_IMPLEMENTATION
+#ifdef _WIN32
 #include <sys/types.h>
-#include "minimp4/minimp4.h"
+#include <stddef.h>
+#endif
+#include "minimp4.h"
 
 static size_t get_nal_size(uint8_t *buf, size_t size)
 {
@@ -14,13 +17,6 @@ static size_t get_nal_size(uint8_t *buf, size_t size)
         pos++;
     }
     return size;
-}
-
-static void write_callback(int64_t offset, const void *buffer, size_t size, void *token)
-{
-    FILE *f = (FILE*)token;
-    fseek(f, offset, SEEK_SET);
-    fwrite(buffer, size, 1, f);
 }
 
 void write_mp4(mp4_h26x_writer_t *mp4wr, int fps, const uint8_t *data, size_t data_size) {
