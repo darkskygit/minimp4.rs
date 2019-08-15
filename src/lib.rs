@@ -75,10 +75,11 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         }
     }
     
-    pub fn close(&self) {
+    pub fn close(&self) -> &W {
         unsafe {
             MP4E__close(self.muxer);
         }
+        &self.writer
     }
 
     pub fn write_data(&mut self, offset: i64, buf: &[u8]) {
