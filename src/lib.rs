@@ -1,5 +1,8 @@
 use libc::malloc;
-use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E__close, MP4E__open, MP4E_mux_t, MP4E__set_text_comment};
+use minimp4_sys::{
+    mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open,
+    MP4E_set_text_comment,
+};
 use std::convert::TryInto;
 use std::ffi::CString;
 use std::io::{Seek, SeekFrom, Write};
@@ -41,7 +44,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         unsafe {
             if self.muxer.is_null() {
                 let self_ptr = self as *mut Self as *mut c_void;
-                self.muxer = MP4E__open(0, self_ptr, Some(Self::write));
+                self.muxer = MP4E_open(0, 0, self_ptr, Some(Self::write));
             }
             mp4_h26x_write_init(
                 self.muxer_writer,
@@ -68,30 +71,31 @@ impl<W: Write + Seek> Mp4Muxer<W> {
     pub fn write_comment(&mut self, comment: &str) {
         self.str_buffer.push(CString::new(comment).unwrap());
         unsafe {
-            MP4E__set_text_comment(
-                self.muxer,
-                self.str_buffer.last().unwrap().as_ptr(),
-            );
+            MP4E_set_text_comment(self.muxer, self.str_buffer.last().unwrap().as_ptr());
         }
     }
-    
     pub fn close(&self) -> &W {
         unsafe {
-            MP4E__close(self.muxer);
+            MP4E_close(self.muxer);
         }
         &self.writer
     }
 
-    pub fn write_data(&mut self, offset: i64, buf: &[u8]) {
+    pub fn write_data(&mut self, offset: i64, buf: &[u8]) -> usize {
         self.writer.seek(SeekFrom::Start(offset as u64)).unwrap();
-        self.writer.write_all(buf).unwrap();
+        self.writer.write(buf).unwrap_or(0)
     }
 
-    extern "C" fn write(offset: i64, buffer: *const c_void, size: usize, token: *mut c_void) {
+    extern "C" fn write(
+        offset: i64,
+        buffer: *const c_void,
+        size: usize,
+        token: *mut c_void,
+    ) -> i32 {
         let p_self = token as *mut Self;
         unsafe {
             let buf = from_raw_parts(buffer as *const u8, size);
-            (&mut *p_self).write_data(offset, buf);
+            ((&mut *p_self).write_data(offset, buf) != size) as i32
         }
     }
 }

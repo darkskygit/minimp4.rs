@@ -19,18 +19,19 @@ static size_t get_nal_size(uint8_t *buf, size_t size)
     return size;
 }
 
-void write_mp4(mp4_h26x_writer_t *mp4wr, int fps, const uint8_t *data, size_t data_size) {
+void write_mp4(mp4_h26x_writer_t *mp4wr, int fps, const uint8_t *data, size_t data_size)
+{
     while (data_size > 0)
     {
         size_t nal_size = get_nal_size(data, data_size);
-        if (!nal_size)
+        if (nal_size < 4)
         {
             data += 1;
             data_size -= 1;
             continue;
         }
-        mp4_h26x_write_nal(mp4wr, data, nal_size, 90000/fps);
-        data  += nal_size;
+        mp4_h26x_write_nal(mp4wr, data, nal_size, 90000 / fps);
+        data += nal_size;
         data_size -= nal_size;
     }
 }
