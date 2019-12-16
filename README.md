@@ -15,11 +15,12 @@ A [minimp4](https://github.com/lieff/minimp4) Rust binding.
 
 # TODO
 
-- [ ] Support hevc mux (Now can mux but cannot play)
+- [x] Support hevc mux
 - [x] Support multiple track
 - [ ] Support audio track
 - [x] Support set track title
 - [ ] Support set metadata
+- [ ] Better error handling
 
 # Contributing
 
