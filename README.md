@@ -2,6 +2,13 @@
 
 A [minimp4](https://github.com/lieff/minimp4) Rust binding.
 
+# Features
+
+- H264 stream mux
+- H265 stream mux
+- set track title
+- set comment
+
 # Usage
 
 ``` rust
