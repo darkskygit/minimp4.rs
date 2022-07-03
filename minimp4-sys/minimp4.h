@@ -18,7 +18,7 @@
 #ifdef __cplusplus
 extern "C"
 {
-#endif //__cplusplus
+#endif
 
 #define MINIMP4_MIN(x, y) ((x) < (y) ? (x) : (y))
 
@@ -51,7 +51,11 @@ extern "C"
 #define MP4D_PRINT_INFO_SUPPORTED 0
 
 #define MP4D_AVC_SUPPORTED 1
+#define MP4D_HEVC_SUPPORTED 1
 #define MP4D_TIMESTAMPS_SUPPORTED 1
+
+// Enable TrackFragmentBaseMediaDecodeTimeBox support
+#define MP4D_TFDT_SUPPORT 0
 
 /************************************************************************/
 /*          Some values of MP4(E/D)_track_t->object_type_indication     */
@@ -137,15 +141,14 @@ typedef unsigned int boxsize_t;
         // Track language: 3-char ISO 639-2T code: "und", "eng", "rus", "jpn" etc...
         unsigned char language[4];
 
-        char *track_name;
-
         track_media_kind_t track_media_kind;
 
         // 90000 for video, sample rate for audio
         unsigned time_scale;
         unsigned default_duration;
 
-        union {
+        union
+        {
             struct
             {
                 // number of channels in the audio track.
@@ -236,7 +239,8 @@ typedef unsigned int boxsize_t;
         // case 0x09: return "MPEGJStream";
         unsigned stream_type;
 
-        union {
+        union
+        {
             // for handler_type == 'soun' tracks
             struct
             {
@@ -324,11 +328,11 @@ typedef unsigned int boxsize_t;
         int pps_bytes[MINIMP4_MAX_PPS];
 
         int map_sps[MINIMP4_MAX_SPS];
-        int map_pps[MINIMP4_MAX_SPS];
+        int map_pps[MINIMP4_MAX_PPS];
 
     } h264_sps_id_patcher_t;
 
-    typedef struct
+    typedef struct mp4_h26x_writer_tag
     {
 #if MINIMP4_TRANSCODE_SPS_ID
         h264_sps_id_patcher_t sps_patcher;
@@ -337,7 +341,7 @@ typedef unsigned int boxsize_t;
         int mux_track_id, is_hevc, need_vps, need_sps, need_pps, need_idr;
     } mp4_h26x_writer_t;
 
-    int mp4_h26x_write_init(mp4_h26x_writer_t *h, MP4E_mux_t *mux, int width, int height, int is_hevc, const char *track_name);
+    int mp4_h26x_write_init(mp4_h26x_writer_t *h, MP4E_mux_t *mux, int width, int height, int is_hevc);
     void mp4_h26x_write_close(mp4_h26x_writer_t *h);
     int mp4_h26x_write_nal(mp4_h26x_writer_t *h, const unsigned char *nal, int length, unsigned timeStamp90kHz_next);
 
@@ -346,143 +350,141 @@ typedef unsigned int boxsize_t;
     /************************************************************************/
 
     /**
-*   Parse given input stream as MP4 file. Allocate and store data indexes.
-*   return 1 on success, 0 on failure
-*   Given file rewind()'ed on return.
-*   The MP4 indexes may be stored at the end of stream, so this
-*   function may parse all stream.
-*   It is guaranteed that function will read/seek sequentially,
-*   and will never jump back.
-*/
+     *   Parse given input stream as MP4 file. Allocate and store data indexes.
+     *   return 1 on success, 0 on failure
+     *   The MP4 indexes may be stored at the end of stream, so this
+     *   function may parse all stream.
+     *   It is guaranteed that function will read/seek sequentially,
+     *   and will never jump back.
+     */
     int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buffer, size_t size, void *token), void *token, int64_t file_size);
 
     /**
-*   Return position and size for given sample from given track. The 'sample' is a
-*   MP4 term for 'frame'
-*
-*   frame_bytes [OUT]   - return coded frame size in bytes
-*   timestamp [OUT]     - return frame timestamp (in mp4->timescale units)
-*   duration [OUT]      - return frame duration (in mp4->timescale units)
-*
-*   function return offset for the frame
-*/
+     *   Return position and size for given sample from given track. The 'sample' is a
+     *   MP4 term for 'frame'
+     *
+     *   frame_bytes [OUT]   - return coded frame size in bytes
+     *   timestamp [OUT]     - return frame timestamp (in mp4->timescale units)
+     *   duration [OUT]      - return frame duration (in mp4->timescale units)
+     *
+     *   function return offset for the frame
+     */
     MP4D_file_offset_t MP4D_frame_offset(const MP4D_demux_t *mp4, unsigned int ntrack, unsigned int nsample, unsigned int *frame_bytes, unsigned *timestamp, unsigned *duration);
 
     /**
-*   De-allocated memory
-*/
+     *   De-allocated memory
+     */
     void MP4D_close(MP4D_demux_t *mp4);
 
     /**
-*   Helper functions to parse mp4.track[ntrack].dsi for H.264 SPS/PPS
-*   Return pointer to internal mp4 memory, it must not be free()-ed
-*
-*   Example: process all SPS in MP4 file:
-*       while (sps = MP4D_read_sps(mp4, num_of_avc_track, sps_count, &sps_bytes))
-*       {
-*           process(sps, sps_bytes);
-*           sps_count++;
-*       }
-*/
+     *   Helper functions to parse mp4.track[ntrack].dsi for H.264 SPS/PPS
+     *   Return pointer to internal mp4 memory, it must not be free()-ed
+     *
+     *   Example: process all SPS in MP4 file:
+     *       while (sps = MP4D_read_sps(mp4, num_of_avc_track, sps_count, &sps_bytes))
+     *       {
+     *           process(sps, sps_bytes);
+     *           sps_count++;
+     *       }
+     */
     const void *MP4D_read_sps(const MP4D_demux_t *mp4, unsigned int ntrack, int nsps, int *sps_bytes);
     const void *MP4D_read_pps(const MP4D_demux_t *mp4, unsigned int ntrack, int npps, int *pps_bytes);
 
 #if MP4D_PRINT_INFO_SUPPORTED
     /**
-*   Print MP4 information to stdout.
-*   Uses printf() as well as floating-point functions
-*   Given as implementation example and for test purposes
-*/
+     *   Print MP4 information to stdout.
+     *   Uses printf() as well as floating-point functions
+     *   Given as implementation example and for test purposes
+     */
     void MP4D_printf_info(const MP4D_demux_t *mp4);
-#endif // #if MP4D_PRINT_INFO_SUPPORTED
+#endif
 
     /**
-*   Allocates and initialize mp4 multiplexor
-*   Given file handler is transparent to the MP4 library, and used only as
-*   argument for given fwrite_callback() function.  By appropriate definition
-*   of callback function application may use any other file output API (for
-*   example C++ streams, or Win32 file functions)
-*
-*   return multiplexor handle on success; NULL on failure
-*/
+     *   Allocates and initialize mp4 multiplexor
+     *   Given file handler is transparent to the MP4 library, and used only as
+     *   argument for given fwrite_callback() function.  By appropriate definition
+     *   of callback function application may use any other file output API (for
+     *   example C++ streams, or Win32 file functions)
+     *
+     *   return multiplexor handle on success; NULL on failure
+     */
     MP4E_mux_t *MP4E_open(int sequential_mode_flag, int enable_fragmentation, void *token,
                           int (*write_callback)(int64_t offset, const void *buffer, size_t size, void *token));
 
     /**
-*   Add new track
-*   The track_data parameter does not referred by the multiplexer after function
-*   return, and may be allocated in short-time memory. The dsi member of
-*   track_data parameter is mandatory.
-*
-*   return ID of added track, or error code MP4E_STATUS_*
-*/
+     *   Add new track
+     *   The track_data parameter does not referred by the multiplexer after function
+     *   return, and may be allocated in short-time memory. The dsi member of
+     *   track_data parameter is mandatory.
+     *
+     *   return ID of added track, or error code MP4E_STATUS_*
+     */
     int MP4E_add_track(MP4E_mux_t *mux, const MP4E_track_t *track_data);
 
     /**
-*   Add new sample to specified track
-*   The tracks numbered starting with 0, according to order of MP4E_add_track() calls
-*   'kind' is one of MP4E_SAMPLE_... defines
-*
-*   return error code MP4E_STATUS_*
-*
-*   Example:
-*       MP4E_put_sample(mux, 0, data, data_bytes, duration, MP4E_SAMPLE_DEFAULT);
-*/
-    int MP4E_put_sample(MP4E_mux_t *mux, int track_num, void *data, int data_bytes, int duration, int kind);
+     *   Add new sample to specified track
+     *   The tracks numbered starting with 0, according to order of MP4E_add_track() calls
+     *   'kind' is one of MP4E_SAMPLE_... defines
+     *
+     *   return error code MP4E_STATUS_*
+     *
+     *   Example:
+     *       MP4E_put_sample(mux, 0, data, data_bytes, duration, MP4E_SAMPLE_DEFAULT);
+     */
+    int MP4E_put_sample(MP4E_mux_t *mux, int track_num, const void *data, int data_bytes, int duration, int kind);
 
     /**
-*   Finalize MP4 file, de-allocated memory, and closes MP4 multiplexer.
-*   The close operation takes a time and disk space, since it writes MP4 file
-*   indexes.  Please note that this function does not closes file handle,
-*   which was passed to open function.
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Finalize MP4 file, de-allocated memory, and closes MP4 multiplexer.
+     *   The close operation takes a time and disk space, since it writes MP4 file
+     *   indexes.  Please note that this function does not closes file handle,
+     *   which was passed to open function.
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_close(MP4E_mux_t *mux);
 
     /**
-*   Set Decoder Specific Info (DSI)
-*   Can be used for audio and private tracks.
-*   MUST be used for AAC track.
-*   Only one DSI can be set. It is an error to set DSI again
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Set Decoder Specific Info (DSI)
+     *   Can be used for audio and private tracks.
+     *   MUST be used for AAC track.
+     *   Only one DSI can be set. It is an error to set DSI again
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_set_dsi(MP4E_mux_t *mux, int track_id, const void *dsi, int bytes);
 
     /**
-*   Set VPS data. MUST be used for HEVC (H.265) track.
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Set VPS data. MUST be used for HEVC (H.265) track.
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_set_vps(MP4E_mux_t *mux, int track_id, const void *vps, int bytes);
 
     /**
-*   Set SPS data. MUST be used for AVC (H.264) track. Up to 32 different SPS can be used in one track.
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Set SPS data. MUST be used for AVC (H.264) track. Up to 32 different SPS can be used in one track.
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_set_sps(MP4E_mux_t *mux, int track_id, const void *sps, int bytes);
 
     /**
-*   Set PPS data. MUST be used for AVC (H.264) track. Up to 256 different PPS can be used in one track.
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Set PPS data. MUST be used for AVC (H.264) track. Up to 256 different PPS can be used in one track.
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_set_pps(MP4E_mux_t *mux, int track_id, const void *pps, int bytes);
 
     /**
-*   Set or replace ASCII test comment for the file. Set comment to NULL to remove comment.
-*
-*   return error code MP4E_STATUS_*
-*/
+     *   Set or replace ASCII test comment for the file. Set comment to NULL to remove comment.
+     *
+     *   return error code MP4E_STATUS_*
+     */
     int MP4E_set_text_comment(MP4E_mux_t *mux, const char *comment);
 
 #ifdef __cplusplus
 }
-#endif //__cplusplus
-
-#endif //MINIMP4_H
+#endif
+#endif // MINIMP4_H
 
 #if defined(MINIMP4_IMPLEMENTATION) && !defined(MINIMP4_IMPLEMENTATION_GUARD)
 #define MINIMP4_IMPLEMENTATION_GUARD
@@ -490,67 +492,67 @@ typedef unsigned int boxsize_t;
 #define FOUR_CHAR_INT(a, b, c, d) (((uint32_t)(a) << 24) | ((b) << 16) | ((c) << 8) | (d))
 enum
 {
-    BOX_co64 = FOUR_CHAR_INT('c', 'o', '6', '4'), //ChunkLargeOffsetAtomType
-    BOX_stco = FOUR_CHAR_INT('s', 't', 'c', 'o'), //ChunkOffsetAtomType
-    BOX_crhd = FOUR_CHAR_INT('c', 'r', 'h', 'd'), //ClockReferenceMediaHeaderAtomType
-    BOX_ctts = FOUR_CHAR_INT('c', 't', 't', 's'), //CompositionOffsetAtomType
-    BOX_cprt = FOUR_CHAR_INT('c', 'p', 'r', 't'), //CopyrightAtomType
-    BOX_url_ = FOUR_CHAR_INT('u', 'r', 'l', ' '), //DataEntryURLAtomType
-    BOX_urn_ = FOUR_CHAR_INT('u', 'r', 'n', ' '), //DataEntryURNAtomType
-    BOX_dinf = FOUR_CHAR_INT('d', 'i', 'n', 'f'), //DataInformationAtomType
-    BOX_dref = FOUR_CHAR_INT('d', 'r', 'e', 'f'), //DataReferenceAtomType
-    BOX_stdp = FOUR_CHAR_INT('s', 't', 'd', 'p'), //DegradationPriorityAtomType
-    BOX_edts = FOUR_CHAR_INT('e', 'd', 't', 's'), //EditAtomType
-    BOX_elst = FOUR_CHAR_INT('e', 'l', 's', 't'), //EditListAtomType
-    BOX_uuid = FOUR_CHAR_INT('u', 'u', 'i', 'd'), //ExtendedAtomType
-    BOX_free = FOUR_CHAR_INT('f', 'r', 'e', 'e'), //FreeSpaceAtomType
-    BOX_hdlr = FOUR_CHAR_INT('h', 'd', 'l', 'r'), //HandlerAtomType
-    BOX_hmhd = FOUR_CHAR_INT('h', 'm', 'h', 'd'), //HintMediaHeaderAtomType
-    BOX_hint = FOUR_CHAR_INT('h', 'i', 'n', 't'), //HintTrackReferenceAtomType
-    BOX_mdia = FOUR_CHAR_INT('m', 'd', 'i', 'a'), //MediaAtomType
-    BOX_mdat = FOUR_CHAR_INT('m', 'd', 'a', 't'), //MediaDataAtomType
-    BOX_mdhd = FOUR_CHAR_INT('m', 'd', 'h', 'd'), //MediaHeaderAtomType
-    BOX_minf = FOUR_CHAR_INT('m', 'i', 'n', 'f'), //MediaInformationAtomType
-    BOX_moov = FOUR_CHAR_INT('m', 'o', 'o', 'v'), //MovieAtomType
-    BOX_mvhd = FOUR_CHAR_INT('m', 'v', 'h', 'd'), //MovieHeaderAtomType
-    BOX_stsd = FOUR_CHAR_INT('s', 't', 's', 'd'), //SampleDescriptionAtomType
-    BOX_stsz = FOUR_CHAR_INT('s', 't', 's', 'z'), //SampleSizeAtomType
-    BOX_stz2 = FOUR_CHAR_INT('s', 't', 'z', '2'), //CompactSampleSizeAtomType
-    BOX_stbl = FOUR_CHAR_INT('s', 't', 'b', 'l'), //SampleTableAtomType
-    BOX_stsc = FOUR_CHAR_INT('s', 't', 's', 'c'), //SampleToChunkAtomType
-    BOX_stsh = FOUR_CHAR_INT('s', 't', 's', 'h'), //ShadowSyncAtomType
-    BOX_skip = FOUR_CHAR_INT('s', 'k', 'i', 'p'), //SkipAtomType
-    BOX_smhd = FOUR_CHAR_INT('s', 'm', 'h', 'd'), //SoundMediaHeaderAtomType
-    BOX_stss = FOUR_CHAR_INT('s', 't', 's', 's'), //SyncSampleAtomType
-    BOX_stts = FOUR_CHAR_INT('s', 't', 't', 's'), //TimeToSampleAtomType
-    BOX_trak = FOUR_CHAR_INT('t', 'r', 'a', 'k'), //TrackAtomType
-    BOX_tkhd = FOUR_CHAR_INT('t', 'k', 'h', 'd'), //TrackHeaderAtomType
-    BOX_tref = FOUR_CHAR_INT('t', 'r', 'e', 'f'), //TrackReferenceAtomType
-    BOX_udta = FOUR_CHAR_INT('u', 'd', 't', 'a'), //UserDataAtomType
-    BOX_vmhd = FOUR_CHAR_INT('v', 'm', 'h', 'd'), //VideoMediaHeaderAtomType
+    BOX_co64 = FOUR_CHAR_INT('c', 'o', '6', '4'), // ChunkLargeOffsetAtomType
+    BOX_stco = FOUR_CHAR_INT('s', 't', 'c', 'o'), // ChunkOffsetAtomType
+    BOX_crhd = FOUR_CHAR_INT('c', 'r', 'h', 'd'), // ClockReferenceMediaHeaderAtomType
+    BOX_ctts = FOUR_CHAR_INT('c', 't', 't', 's'), // CompositionOffsetAtomType
+    BOX_cprt = FOUR_CHAR_INT('c', 'p', 'r', 't'), // CopyrightAtomType
+    BOX_url_ = FOUR_CHAR_INT('u', 'r', 'l', ' '), // DataEntryURLAtomType
+    BOX_urn_ = FOUR_CHAR_INT('u', 'r', 'n', ' '), // DataEntryURNAtomType
+    BOX_dinf = FOUR_CHAR_INT('d', 'i', 'n', 'f'), // DataInformationAtomType
+    BOX_dref = FOUR_CHAR_INT('d', 'r', 'e', 'f'), // DataReferenceAtomType
+    BOX_stdp = FOUR_CHAR_INT('s', 't', 'd', 'p'), // DegradationPriorityAtomType
+    BOX_edts = FOUR_CHAR_INT('e', 'd', 't', 's'), // EditAtomType
+    BOX_elst = FOUR_CHAR_INT('e', 'l', 's', 't'), // EditListAtomType
+    BOX_uuid = FOUR_CHAR_INT('u', 'u', 'i', 'd'), // ExtendedAtomType
+    BOX_free = FOUR_CHAR_INT('f', 'r', 'e', 'e'), // FreeSpaceAtomType
+    BOX_hdlr = FOUR_CHAR_INT('h', 'd', 'l', 'r'), // HandlerAtomType
+    BOX_hmhd = FOUR_CHAR_INT('h', 'm', 'h', 'd'), // HintMediaHeaderAtomType
+    BOX_hint = FOUR_CHAR_INT('h', 'i', 'n', 't'), // HintTrackReferenceAtomType
+    BOX_mdia = FOUR_CHAR_INT('m', 'd', 'i', 'a'), // MediaAtomType
+    BOX_mdat = FOUR_CHAR_INT('m', 'd', 'a', 't'), // MediaDataAtomType
+    BOX_mdhd = FOUR_CHAR_INT('m', 'd', 'h', 'd'), // MediaHeaderAtomType
+    BOX_minf = FOUR_CHAR_INT('m', 'i', 'n', 'f'), // MediaInformationAtomType
+    BOX_moov = FOUR_CHAR_INT('m', 'o', 'o', 'v'), // MovieAtomType
+    BOX_mvhd = FOUR_CHAR_INT('m', 'v', 'h', 'd'), // MovieHeaderAtomType
+    BOX_stsd = FOUR_CHAR_INT('s', 't', 's', 'd'), // SampleDescriptionAtomType
+    BOX_stsz = FOUR_CHAR_INT('s', 't', 's', 'z'), // SampleSizeAtomType
+    BOX_stz2 = FOUR_CHAR_INT('s', 't', 'z', '2'), // CompactSampleSizeAtomType
+    BOX_stbl = FOUR_CHAR_INT('s', 't', 'b', 'l'), // SampleTableAtomType
+    BOX_stsc = FOUR_CHAR_INT('s', 't', 's', 'c'), // SampleToChunkAtomType
+    BOX_stsh = FOUR_CHAR_INT('s', 't', 's', 'h'), // ShadowSyncAtomType
+    BOX_skip = FOUR_CHAR_INT('s', 'k', 'i', 'p'), // SkipAtomType
+    BOX_smhd = FOUR_CHAR_INT('s', 'm', 'h', 'd'), // SoundMediaHeaderAtomType
+    BOX_stss = FOUR_CHAR_INT('s', 't', 's', 's'), // SyncSampleAtomType
+    BOX_stts = FOUR_CHAR_INT('s', 't', 't', 's'), // TimeToSampleAtomType
+    BOX_trak = FOUR_CHAR_INT('t', 'r', 'a', 'k'), // TrackAtomType
+    BOX_tkhd = FOUR_CHAR_INT('t', 'k', 'h', 'd'), // TrackHeaderAtomType
+    BOX_tref = FOUR_CHAR_INT('t', 'r', 'e', 'f'), // TrackReferenceAtomType
+    BOX_udta = FOUR_CHAR_INT('u', 'd', 't', 'a'), // UserDataAtomType
+    BOX_vmhd = FOUR_CHAR_INT('v', 'm', 'h', 'd'), // VideoMediaHeaderAtomType
     BOX_url = FOUR_CHAR_INT('u', 'r', 'l', ' '),
     BOX_urn = FOUR_CHAR_INT('u', 'r', 'n', ' '),
 
-    BOX_gnrv = FOUR_CHAR_INT('g', 'n', 'r', 'v'), //GenericVisualSampleEntryAtomType
-    BOX_gnra = FOUR_CHAR_INT('g', 'n', 'r', 'a'), //GenericAudioSampleEntryAtomType
+    BOX_gnrv = FOUR_CHAR_INT('g', 'n', 'r', 'v'), // GenericVisualSampleEntryAtomType
+    BOX_gnra = FOUR_CHAR_INT('g', 'n', 'r', 'a'), // GenericAudioSampleEntryAtomType
 
-    //V2 atoms
-    BOX_ftyp = FOUR_CHAR_INT('f', 't', 'y', 'p'), //FileTypeAtomType
-    BOX_padb = FOUR_CHAR_INT('p', 'a', 'd', 'b'), //PaddingBitsAtomType
+    // V2 atoms
+    BOX_ftyp = FOUR_CHAR_INT('f', 't', 'y', 'p'), // FileTypeAtomType
+    BOX_padb = FOUR_CHAR_INT('p', 'a', 'd', 'b'), // PaddingBitsAtomType
 
-    //MP4 Atoms
-    BOX_sdhd = FOUR_CHAR_INT('s', 'd', 'h', 'd'), //SceneDescriptionMediaHeaderAtomType
-    BOX_dpnd = FOUR_CHAR_INT('d', 'p', 'n', 'd'), //StreamDependenceAtomType
-    BOX_iods = FOUR_CHAR_INT('i', 'o', 'd', 's'), //ObjectDescriptorAtomType
-    BOX_odhd = FOUR_CHAR_INT('o', 'd', 'h', 'd'), //ObjectDescriptorMediaHeaderAtomType
-    BOX_mpod = FOUR_CHAR_INT('m', 'p', 'o', 'd'), //ODTrackReferenceAtomType
-    BOX_nmhd = FOUR_CHAR_INT('n', 'm', 'h', 'd'), //MPEGMediaHeaderAtomType
-    BOX_esds = FOUR_CHAR_INT('e', 's', 'd', 's'), //ESDAtomType
-    BOX_sync = FOUR_CHAR_INT('s', 'y', 'n', 'c'), //OCRReferenceAtomType
-    BOX_ipir = FOUR_CHAR_INT('i', 'p', 'i', 'r'), //IPIReferenceAtomType
-    BOX_mp4s = FOUR_CHAR_INT('m', 'p', '4', 's'), //MPEGSampleEntryAtomType
-    BOX_mp4a = FOUR_CHAR_INT('m', 'p', '4', 'a'), //MPEGAudioSampleEntryAtomType
-    BOX_mp4v = FOUR_CHAR_INT('m', 'p', '4', 'v'), //MPEGVisualSampleEntryAtomType
+    // MP4 Atoms
+    BOX_sdhd = FOUR_CHAR_INT('s', 'd', 'h', 'd'), // SceneDescriptionMediaHeaderAtomType
+    BOX_dpnd = FOUR_CHAR_INT('d', 'p', 'n', 'd'), // StreamDependenceAtomType
+    BOX_iods = FOUR_CHAR_INT('i', 'o', 'd', 's'), // ObjectDescriptorAtomType
+    BOX_odhd = FOUR_CHAR_INT('o', 'd', 'h', 'd'), // ObjectDescriptorMediaHeaderAtomType
+    BOX_mpod = FOUR_CHAR_INT('m', 'p', 'o', 'd'), // ODTrackReferenceAtomType
+    BOX_nmhd = FOUR_CHAR_INT('n', 'm', 'h', 'd'), // MPEGMediaHeaderAtomType
+    BOX_esds = FOUR_CHAR_INT('e', 's', 'd', 's'), // ESDAtomType
+    BOX_sync = FOUR_CHAR_INT('s', 'y', 'n', 'c'), // OCRReferenceAtomType
+    BOX_ipir = FOUR_CHAR_INT('i', 'p', 'i', 'r'), // IPIReferenceAtomType
+    BOX_mp4s = FOUR_CHAR_INT('m', 'p', '4', 's'), // MPEGSampleEntryAtomType
+    BOX_mp4a = FOUR_CHAR_INT('m', 'p', '4', 'a'), // MPEGAudioSampleEntryAtomType
+    BOX_mp4v = FOUR_CHAR_INT('m', 'p', '4', 'v'), // MPEGVisualSampleEntryAtomType
 
     // http://www.itscj.ipsj.or.jp/sc29/open/29view/29n7644t.doc
     BOX_avc1 = FOUR_CHAR_INT('a', 'v', 'c', '1'),
@@ -567,31 +569,32 @@ enum
     BOX_hvc1 = FOUR_CHAR_INT('h', 'v', 'c', '1'),
     BOX_hvcC = FOUR_CHAR_INT('h', 'v', 'c', 'C'),
 
-    //3GPP atoms
-    BOX_samr = FOUR_CHAR_INT('s', 'a', 'm', 'r'), //AMRSampleEntryAtomType
-    BOX_sawb = FOUR_CHAR_INT('s', 'a', 'w', 'b'), //WB_AMRSampleEntryAtomType
-    BOX_damr = FOUR_CHAR_INT('d', 'a', 'm', 'r'), //AMRConfigAtomType
-    BOX_s263 = FOUR_CHAR_INT('s', '2', '6', '3'), //H263SampleEntryAtomType
-    BOX_d263 = FOUR_CHAR_INT('d', '2', '6', '3'), //H263ConfigAtomType
+    // 3GPP atoms
+    BOX_samr = FOUR_CHAR_INT('s', 'a', 'm', 'r'), // AMRSampleEntryAtomType
+    BOX_sawb = FOUR_CHAR_INT('s', 'a', 'w', 'b'), // WB_AMRSampleEntryAtomType
+    BOX_damr = FOUR_CHAR_INT('d', 'a', 'm', 'r'), // AMRConfigAtomType
+    BOX_s263 = FOUR_CHAR_INT('s', '2', '6', '3'), // H263SampleEntryAtomType
+    BOX_d263 = FOUR_CHAR_INT('d', '2', '6', '3'), // H263ConfigAtomType
 
-    //V2 atoms - Movie Fragments
-    BOX_mvex = FOUR_CHAR_INT('m', 'v', 'e', 'x'), //MovieExtendsAtomType
-    BOX_trex = FOUR_CHAR_INT('t', 'r', 'e', 'x'), //TrackExtendsAtomType
-    BOX_moof = FOUR_CHAR_INT('m', 'o', 'o', 'f'), //MovieFragmentAtomType
-    BOX_mfhd = FOUR_CHAR_INT('m', 'f', 'h', 'd'), //MovieFragmentHeaderAtomType
-    BOX_traf = FOUR_CHAR_INT('t', 'r', 'a', 'f'), //TrackFragmentAtomType
-    BOX_tfhd = FOUR_CHAR_INT('t', 'f', 'h', 'd'), //TrackFragmentHeaderAtomType
-    BOX_trun = FOUR_CHAR_INT('t', 'r', 'u', 'n'), //TrackFragmentRunAtomType
-    BOX_mehd = FOUR_CHAR_INT('m', 'e', 'h', 'd'), //MovieExtendsHeaderBox
+    // V2 atoms - Movie Fragments
+    BOX_mvex = FOUR_CHAR_INT('m', 'v', 'e', 'x'), // MovieExtendsAtomType
+    BOX_trex = FOUR_CHAR_INT('t', 'r', 'e', 'x'), // TrackExtendsAtomType
+    BOX_moof = FOUR_CHAR_INT('m', 'o', 'o', 'f'), // MovieFragmentAtomType
+    BOX_mfhd = FOUR_CHAR_INT('m', 'f', 'h', 'd'), // MovieFragmentHeaderAtomType
+    BOX_traf = FOUR_CHAR_INT('t', 'r', 'a', 'f'), // TrackFragmentAtomType
+    BOX_tfhd = FOUR_CHAR_INT('t', 'f', 'h', 'd'), // TrackFragmentHeaderAtomType
+    BOX_tfdt = FOUR_CHAR_INT('t', 'f', 'd', 't'), // TrackFragmentBaseMediaDecodeTimeBox
+    BOX_trun = FOUR_CHAR_INT('t', 'r', 'u', 'n'), // TrackFragmentRunAtomType
+    BOX_mehd = FOUR_CHAR_INT('m', 'e', 'h', 'd'), // MovieExtendsHeaderBox
 
     // Object Descriptors (OD) data coding
     // These takes only 1 byte; this implementation translate <od_tag> to
     // <od_tag> + OD_BASE to keep API uniform and safe for string functions
     OD_BASE = FOUR_CHAR_INT('$', '$', '$', '0'), //
-    OD_ESD = FOUR_CHAR_INT('$', '$', '$', '3'),  //SDescriptor_Tag
-    OD_DCD = FOUR_CHAR_INT('$', '$', '$', '4'),  //DecoderConfigDescriptor_Tag
-    OD_DSI = FOUR_CHAR_INT('$', '$', '$', '5'),  //DecoderSpecificInfo_Tag
-    OD_SLC = FOUR_CHAR_INT('$', '$', '$', '6'),  //SLConfigDescriptor_Tag
+    OD_ESD = FOUR_CHAR_INT('$', '$', '$', '3'),  // SDescriptor_Tag
+    OD_DCD = FOUR_CHAR_INT('$', '$', '$', '4'),  // DecoderConfigDescriptor_Tag
+    OD_DSI = FOUR_CHAR_INT('$', '$', '$', '5'),  // DecoderSpecificInfo_Tag
+    OD_SLC = FOUR_CHAR_INT('$', '$', '$', '6'),  // SLConfigDescriptor_Tag
 
     BOX_meta = FOUR_CHAR_INT('m', 'e', 't', 'a'),
     BOX_ilst = FOUR_CHAR_INT('i', 'l', 's', 't'),
@@ -629,7 +632,7 @@ enum
     BOX_purd = FOUR_CHAR_INT('p', 'u', 'r', 'd'),    // purchase date
     BOX_pgap = FOUR_CHAR_INT('p', 'g', 'a', 'p'),    // Gapless Playback (byte)
 
-    //BOX_aart   = FOUR_CHAR_INT( 'a', 'a', 'r', 't' ),     // Album artist
+    // BOX_aart   = FOUR_CHAR_INT( 'a', 'a', 'r', 't' ),     // Album artist
     BOX_cART = FOUR_CHAR_INT('\xa9', 'A', 'R', 'T'), // artist
     BOX_gnre = FOUR_CHAR_INT('g', 'n', 'r', 'e'),
 
@@ -761,8 +764,8 @@ static const unsigned char box_ftyp[] = {
 };
 
 /**
-*   Endian-independent byte-write macros
-*/
+ *   Endian-independent byte-write macros
+ */
 #define WR(x, n) *p++ = (unsigned char)((x) >> 8 * n)
 #define WRITE_1(x) WR(x, 0);
 #define WRITE_2(x) \
@@ -875,9 +878,9 @@ static unsigned char *minimp4_vector_put(minimp4_vector_t *h, const void *buf, i
 }
 
 /**
-*   Allocates and initialize mp4 multiplexer
-*   return multiplexor handle on success; NULL on failure
-*/
+ *   Allocates and initialize mp4 multiplexer
+ *   return multiplexor handle on success; NULL on failure
+ */
 MP4E_mux_t *MP4E_open(int sequential_mode_flag, int enable_fragmentation, void *token,
                       int (*write_callback)(int64_t offset, const void *buffer, size_t size, void *token))
 {
@@ -908,8 +911,8 @@ MP4E_mux_t *MP4E_open(int sequential_mode_flag, int enable_fragmentation, void *
 }
 
 /**
-*   Add new track
-*/
+ *   Add new track
+ */
 int MP4E_add_track(MP4E_mux_t *mux, const MP4E_track_t *track_data)
 {
     track_t *tr;
@@ -1060,9 +1063,14 @@ static int add_sample_descriptor(MP4E_mux_t *mux, track_t *tr, int data_bytes, i
 static int mp4e_flush_index(MP4E_mux_t *mux);
 
 /**
-*   Write Movie Fragment: 'moof' box
-*/
-static int mp4e_write_fragment_header(MP4E_mux_t *mux, int track_num, int data_bytes, int duration, int kind)
+ *   Write Movie Fragment: 'moof' box
+ */
+static int mp4e_write_fragment_header(MP4E_mux_t *mux, int track_num, int data_bytes, int duration, int kind
+#if MP4D_TFDT_SUPPORT
+                                      ,
+                                      uint64_t timestamp
+#endif
+)
 {
     unsigned char base[888], *p = base;
     unsigned char *stack_base[20]; // atoms nesting stack
@@ -1093,8 +1101,6 @@ static int mp4e_write_fragment_header(MP4E_mux_t *mux, int track_num, int data_b
     WRITE_4(track_num + 1); // track_ID
     if (tr->info.track_media_kind == e_video)
     {
-        flags = 0x001;      // data-offset-present
-        flags |= 0x100;     // sample-duration-present
         WRITE_4(0x1010000); // default_sample_flags
     }
     else
@@ -1102,6 +1108,12 @@ static int mp4e_write_fragment_header(MP4E_mux_t *mux, int track_num, int data_b
         WRITE_4(duration);
     }
     END_ATOM
+#if MP4D_TFDT_SUPPORT
+    ATOM_FULL(BOX_tfdt, 0x01000000)  // version 1
+    WRITE_4(timestamp >> 32);        // upper timestamp
+    WRITE_4(timestamp & 0xffffffff); // lower timestamp
+    END_ATOM
+#endif
     if (tr->info.track_media_kind == e_audio)
     {
         flags = 0;
@@ -1110,8 +1122,8 @@ static int mp4e_write_fragment_header(MP4E_mux_t *mux, int track_num, int data_b
         ATOM_FULL(BOX_trun, flags)
         WRITE_4(1); // sample_count
         pdata_offset = p;
-        p += 4;            // save ptr to data_offset
-        WRITE_4(duration); // sample_duration
+        p += 4;              // save ptr to data_offset
+        WRITE_4(data_bytes); // sample_size
         END_ATOM
     }
     else if (kind == MP4E_SAMPLE_RANDOM_ACCESS)
@@ -1164,9 +1176,9 @@ static int mp4e_write_mdat_box(MP4E_mux_t *mux, uint32_t size)
 }
 
 /**
-*   Add new sample to specified track
-*/
-int MP4E_put_sample(MP4E_mux_t *mux, int track_num, void *data, int data_bytes, int duration, int kind)
+ *   Add new sample to specified track
+ */
+int MP4E_put_sample(MP4E_mux_t *mux, int track_num, const void *data, int data_bytes, int duration, int kind)
 {
     track_t *tr;
     if (!mux || !data)
@@ -1175,10 +1187,18 @@ int MP4E_put_sample(MP4E_mux_t *mux, int track_num, void *data, int data_bytes, 
 
     if (mux->enable_fragmentation)
     {
+#if MP4D_TFDT_SUPPORT
+        // NOTE: assume a constant `duration` to calculate current timestamp
+        uint64_t timestamp = (uint64_t)mux->fragments_count * duration;
+#endif
         if (!mux->fragments_count++)
             ERR(mp4e_flush_index(mux)); // write file headers before 1st sample
-        // write MOOF + MDAT + sample data
+// write MOOF + MDAT + sample data
+#if MP4D_TFDT_SUPPORT
+        ERR(mp4e_write_fragment_header(mux, track_num, data_bytes, duration, kind, timestamp));
+#else
         ERR(mp4e_write_fragment_header(mux, track_num, data_bytes, duration, kind));
+#endif
         // write MDAT box for each sample
         ERR(mp4e_write_mdat_box(mux, data_bytes + 8));
         ERR(mux->write_callback(mux->write_pos, data, data_bytes, mux->token));
@@ -1220,8 +1240,8 @@ int MP4E_put_sample(MP4E_mux_t *mux, int track_num, void *data, int data_bytes, 
 }
 
 /**
-*   calculate size of length field of OD box
-*/
+ *   calculate size of length field of OD box
+ */
 static int od_size_of_size(int size)
 {
     int i, size_of_size = 1;
@@ -1231,11 +1251,11 @@ static int od_size_of_size(int size)
 }
 
 /**
-*   Add or remove MP4 file text comment according to Apple specs:
-*   https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/Metadata/Metadata.html#//apple_ref/doc/uid/TP40000939-CH1-SW1
-*   http://atomicparsley.sourceforge.net/mpeg-4files.html
-*   note that ISO did not specify comment format.
-*/
+ *   Add or remove MP4 file text comment according to Apple specs:
+ *   https://developer.apple.com/library/mac/documentation/QuickTime/QTFF/Metadata/Metadata.html#//apple_ref/doc/uid/TP40000939-CH1-SW1
+ *   http://atomicparsley.sourceforge.net/mpeg-4files.html
+ *   note that ISO did not specify comment format.
+ */
 int MP4E_set_text_comment(MP4E_mux_t *mux, const char *comment)
 {
     if (!mux || !comment)
@@ -1249,8 +1269,8 @@ int MP4E_set_text_comment(MP4E_mux_t *mux, const char *comment)
 }
 
 /**
-*   Write file index 'moov' box with all its boxes and indexes
-*/
+ *   Write file index 'moov' box with all its boxes and indexes
+ */
 static int mp4e_flush_index(MP4E_mux_t *mux)
 {
     unsigned char *stack_base[20]; // atoms nesting stack
@@ -1291,7 +1311,7 @@ static int mp4e_flush_index(MP4E_mux_t *mux)
     {
         // update size of mdat box.
         // One of 2 points, which requires random file access.
-        // Second is optonal duration update at beginning of file in fragmenatation mode.
+        // Second is optional duration update at beginning of file in fragmentation mode.
         // This can be avoided using "till eof" size code, but in this case indexes must be
         // written before the mdat....
         int64_t size = mux->write_pos - sizeof(box_ftyp);
@@ -1355,9 +1375,9 @@ static int mp4e_flush_index(MP4E_mux_t *mux)
     WRITE_4(0);
     WRITE_4(0);
 
-    //next_track_ID is a non-zero integer that indicates a value to use for the track ID of the next track to be
-    //added to this presentation. Zero is not a valid track ID value. The value of next_track_ID shall be
-    //larger than the largest track-ID in use.
+    // next_track_ID is a non-zero integer that indicates a value to use for the track ID of the next track to be
+    // added to this presentation. Zero is not a valid track ID value. The value of next_track_ID shall be
+    // larger than the largest track-ID in use.
     WRITE_4(ntracks + 1);
     END_ATOM;
 
@@ -1379,25 +1399,11 @@ static int mp4e_flush_index(MP4E_mux_t *mux)
         {
         case e_audio:
             handler_type = MP4E_HANDLER_TYPE_SOUN;
-            if (tr->info.track_name)
-            {
-                handler_ascii = tr->info.track_name;
-            }
-            else
-            {
-                handler_ascii = "SoundHandler";
-            }
+            handler_ascii = "SoundHandler";
             break;
         case e_video:
             handler_type = MP4E_HANDLER_TYPE_VIDE;
-            if (tr->info.track_name)
-            {
-                handler_ascii = tr->info.track_name;
-            }
-            else
-            {
-                handler_ascii = "VideoHandler";
-            }
+            handler_ascii = "VideoHandler";
             break;
         case e_private:
             handler_type = MP4E_HANDLER_TYPE_GESM;
@@ -1972,8 +1978,8 @@ static void init_bits(bit_reader_t *bs, const void *data, unsigned data_bytes)
 #define GetBits(n) get_bits(bs, n)
 
 /**
-*   Unsigned Golomb code
-*/
+ *   Unsigned Golomb code
+ */
 static int ue_bits(bit_reader_t *bs)
 {
     int clz;
@@ -1981,7 +1987,7 @@ static int ue_bits(bit_reader_t *bs)
     for (clz = 0; !get_bits(bs, 1); clz++)
     {
     }
-    //get_bits(bs, clz + 1);
+    // get_bits(bs, clz + 1);
     val = (1 << clz) - 1 + (clz ? get_bits(bs, clz) : 0);
     return val;
 }
@@ -1989,8 +1995,8 @@ static int ue_bits(bit_reader_t *bs)
 #if MINIMP4_TRANSCODE_SPS_ID
 
 /**
-*   Output bitstream
-*/
+ *   Output bitstream
+ */
 typedef struct
 {
     int shift;         // bit position in the cache
@@ -2038,19 +2044,19 @@ static unsigned h264e_bs_byte_align(bs_t *bs)
 }
 
 /**
-*   Golomb code
-*   0 => 1
-*   1 => 01 0
-*   2 => 01 1
-*   3 => 001 00
-*   4 => 001 01
-*
-*   [0]     => 1
-*   [1..2]  => 01x
-*   [3..6]  => 001xx
-*   [7..14] => 0001xxx
-*
-*/
+ *   Golomb code
+ *   0 => 1
+ *   1 => 01 0
+ *   2 => 01 1
+ *   3 => 001 00
+ *   4 => 001 01
+ *
+ *   [0]     => 1
+ *   [1..2]  => 01x
+ *   [3..6]  => 001xx
+ *   [7..14] => 0001xxx
+ *
+ */
 static void h264e_bs_put_golomb(bs_t *bs, unsigned val)
 {
     int size = 0;
@@ -2098,8 +2104,8 @@ static int find_mem_cache(void *cache[], int cache_bytes[], int cache_size, void
 }
 
 /**
-*   7.4.1.1. "Encapsulation of an SODB within an RBSP"
-*/
+ *   7.4.1.1. "Encapsulation of an SODB within an RBSP"
+ */
 static int remove_nal_escapes(unsigned char *dst, const unsigned char *src, int h264_data_bytes)
 {
     int i = 0, j = 0, zero_cnt = 0;
@@ -2121,7 +2127,7 @@ static int remove_nal_escapes(unsigned char *dst, const unsigned char *src, int 
                 else
                 {
                     // TODO: assume end-of-nal
-                    //return 0;
+                    // return 0;
                 }
             }
             else
@@ -2133,13 +2139,13 @@ static int remove_nal_escapes(unsigned char *dst, const unsigned char *src, int 
         else
             zero_cnt++;
     }
-    //while (--j > i) src[j] = 0;
+    // while (--j > i) src[j] = 0;
     return i;
 }
 
 /**
-*   Put NAL escape codes to the output bitstream
-*/
+ *   Put NAL escape codes to the output bitstream
+ */
 static int nal_put_esc(uint8_t *d, const uint8_t *s, int n)
 {
     int i, j = 4, cntz = 0;
@@ -2304,13 +2310,13 @@ static int transcode_nalu(h264_sps_id_patcher_t *h, const unsigned char *src, in
 #endif
 
 /**
-*   Set pointer just after start code (00 .. 00 01), or to EOF if not found:
-*
-*   NZ NZ ... NZ 00 00 00 00 01 xx xx ... xx (EOF)
-*                               ^            ^
-*   non-zero head.............. here ....... or here if no start code found
-*
-*/
+ *   Set pointer just after start code (00 .. 00 01), or to EOF if not found:
+ *
+ *   NZ NZ ... NZ 00 00 00 00 01 xx xx ... xx (EOF)
+ *                               ^            ^
+ *   non-zero head.............. here ....... or here if no start code found
+ *
+ */
 static const uint8_t *find_start_code(const uint8_t *h264_data, int h264_data_bytes, int *zcount)
 {
     const uint8_t *eof = h264_data + h264_data_bytes;
@@ -2318,8 +2324,8 @@ static const uint8_t *find_start_code(const uint8_t *h264_data, int h264_data_by
     do
     {
         int zero_cnt = 1;
-        while (p < eof && *p)
-            p++;
+        const uint8_t *found = (uint8_t *)memchr(p, 0, eof - p);
+        p = found ? found : eof;
         while (p + zero_cnt < eof && !p[zero_cnt])
             zero_cnt++;
         if (zero_cnt >= 2 && p[zero_cnt] == 1)
@@ -2334,8 +2340,8 @@ static const uint8_t *find_start_code(const uint8_t *h264_data, int h264_data_by
 }
 
 /**
-*   Locate NAL unit in given buffer, and calculate it's length
-*/
+ *   Locate NAL unit in given buffer, and calculate it's length
+ */
 static const uint8_t *find_nal_unit(const uint8_t *h264_data, int h264_data_bytes, int *pnal_unit_bytes)
 {
     const uint8_t *eof = h264_data + h264_data_bytes;
@@ -2355,11 +2361,10 @@ static const uint8_t *find_nal_unit(const uint8_t *h264_data, int h264_data_byte
     return start;
 }
 
-int mp4_h26x_write_init(mp4_h26x_writer_t *h, MP4E_mux_t *mux, int width, int height, int is_hevc, const char *track_name)
+int mp4_h26x_write_init(mp4_h26x_writer_t *h, MP4E_mux_t *mux, int width, int height, int is_hevc)
 {
     MP4E_track_t tr;
     tr.track_media_kind = e_video;
-    tr.track_name = track_name;
     tr.language[0] = 'u';
     tr.language[1] = 'n';
     tr.language[2] = 'd';
@@ -2407,7 +2412,7 @@ static int mp4_h265_write_nal(mp4_h26x_writer_t *h, const unsigned char *nal, in
     int payload_type = (nal[0] >> 1) & 0x3f;
     int is_intra = payload_type >= HEVC_NAL_BLA_W_LP && payload_type <= HEVC_NAL_CRA_NUT;
     int err = MP4E_STATUS_OK;
-    //printf("payload_type=%d, intra=%d\n", payload_type, is_intra);
+    // printf("payload_type=%d, intra=%d\n", payload_type, is_intra);
 
     if (is_intra && !h->need_sps && !h->need_pps && !h->need_vps)
         h->need_idr = 0;
@@ -2466,6 +2471,8 @@ int mp4_h26x_write_nal(mp4_h26x_writer_t *h, const unsigned char *nal, int lengt
             continue;
         }
         payload_type = nal[0] & 31;
+        if (9 == payload_type)
+            continue; // access unit delimiter, nothing to be done
 #if MINIMP4_TRANSCODE_SPS_ID
         // Transcode SPS, PPS and slice headers, reassigning ID's for SPS and  PPS:
         // - assign unique ID's to different SPS and PPS
@@ -2517,7 +2524,7 @@ int mp4_h26x_write_nal(mp4_h26x_writer_t *h, const unsigned char *nal, int lengt
                 bit_reader_t bs[1];
                 init_bits(bs, nal + 1, sizeof_nal - 4 - 1);
                 unsigned first_mb_in_slice = ue_bits(bs);
-                //unsigned slice_type = ue_bits(bs);
+                // unsigned slice_type = ue_bits(bs);
                 int sample_kind = MP4E_SAMPLE_DEFAULT;
                 nal2[0] = (unsigned char)((sizeof_nal - 4) >> 24);
                 nal2[1] = (unsigned char)((sizeof_nal - 4) >> 16);
@@ -2578,6 +2585,8 @@ int mp4_h26x_write_nal(mp4_h26x_writer_t *h, const unsigned char *nal, int lengt
             break;
         }
 #endif
+        if (err)
+            break;
     }
     return err;
 }
@@ -2600,9 +2609,9 @@ static int minimp4_fgets(MP4D_demux_t *mp4)
 }
 
 /**
-*   Read given number of bytes from input stream
-*   Used to read box headers
-*/
+ *   Read given number of bytes from input stream
+ *   Used to read box headers
+ */
 static unsigned minimp4_read(MP4D_demux_t *mp4, int nb, int *eof_flag)
 {
     uint32_t v = 0;
@@ -2627,9 +2636,9 @@ static unsigned minimp4_read(MP4D_demux_t *mp4, int nb, int *eof_flag)
 }
 
 /**
-*   Read given number of bytes, but no more than *payload_bytes specifies...
-*   Used to read box payload
-*/
+ *   Read given number of bytes, but no more than *payload_bytes specifies...
+ *   Used to read box payload
+ */
 static uint32_t read_payload(MP4D_demux_t *mp4, unsigned nb, boxsize_t *payload_bytes, int *eof_flag)
 {
     if (*payload_bytes < nb)
@@ -2643,9 +2652,9 @@ static uint32_t read_payload(MP4D_demux_t *mp4, unsigned nb, boxsize_t *payload_
 }
 
 /**
-*   Skips given number of bytes.
-*   Avoid math operations with fpos_t
-*/
+ *   Skips given number of bytes.
+ *   Avoid math operations with fpos_t
+ */
 static void my_fseek(MP4D_demux_t *mp4, boxsize_t pos, int *eof_flag)
 {
     mp4->read_pos += pos;
@@ -2668,8 +2677,8 @@ static void my_fseek(MP4D_demux_t *mp4, boxsize_t pos, int *eof_flag)
     }
 
 /*
-*   On error: release resources, rewind the file.
-*/
+ *   On error: release resources.
+ */
 #define RETURN_ERROR(mess)             \
     {                                  \
         TRACE(("\nMP4 ERROR: " mess)); \
@@ -2678,8 +2687,8 @@ static void my_fseek(MP4D_demux_t *mp4, boxsize_t pos, int *eof_flag)
     }
 
 /*
-*   Any errors, occurred on top-level hierarchy is passed to exit check: 'if (!mp4->track_count) ... '
-*/
+ *   Any errors, occurred on top-level hierarchy is passed to exit check: 'if (!mp4->track_count) ... '
+ */
 #define ERROR(mess) \
     if (!depth)     \
         break;      \
@@ -2777,6 +2786,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
             {OD_DSI, BOX_OD},
             {BOX_trak, BOX_ATOM},
             {BOX_moov, BOX_ATOM},
+            //{BOX_moof, BOX_ATOM},
             {BOX_mdia, BOX_ATOM},
             {BOX_tref, BOX_ATOM},
             {BOX_minf, BOX_ATOM},
@@ -2788,8 +2798,11 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
 #if MP4D_AVC_SUPPORTED
             {BOX_mp4v, BOX_ATOM},
             {BOX_avc1, BOX_ATOM},
-//             {BOX_avc2, BOX_ATOM},
-//             {BOX_svc1, BOX_ATOM},
+        //{BOX_avc2, BOX_ATOM},
+        //{BOX_svc1, BOX_ATOM},
+#endif
+#if MP4D_HEVC_SUPPORTED
+            {BOX_hvc1, BOX_ATOM},
 #endif
             {BOX_udta, BOX_ATOM},
             {BOX_meta, BOX_ATOM},
@@ -2813,9 +2826,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
         broken_android_meta_hack:
 #endif
             if (eof_flag)
-            {
                 break; // normal exit
-            }
 
             if (box_bytes >= 2 && box_bytes < 8)
             {
@@ -2905,9 +2916,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
             box_name = OD_BASE + minimp4_read(mp4, 1, &eof_flag); // 1-byte box type
             read_bytes += 1;
             if (eof_flag)
-            {
                 break;
-            }
 
             payload_bytes = 0;
             box_bytes = 1;
@@ -2948,7 +2957,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
         // Read box header
         switch (box_name)
         {
-        case BOX_stz2: //ISO/IEC 14496-1 Page 38. Section 8.17.2 - Sample Size Box.
+        case BOX_stz2: // ISO/IEC 14496-1 Page 38. Section 8.17.2 - Sample Size Box.
         case BOX_stsz:
         {
             int size = 0;
@@ -2988,7 +2997,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
         }
         break;
 
-        case BOX_stsc: //ISO/IEC 14496-12 Page 38. Section 8.18 - Sample To Chunk Box.
+        case BOX_stsc: // ISO/IEC 14496-12 Page 38. Section 8.18 - Sample To Chunk Box.
             tr->sample_to_chunk_count = READ(4);
             MALLOC(MP4D_sample_to_chunk_t *, tr->sample_to_chunk, tr->sample_to_chunk_count * sizeof(tr->sample_to_chunk[0]));
             for (i = 0; i < tr->sample_to_chunk_count; i++)
@@ -3044,7 +3053,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
         }
         break;
 #endif
-        case BOX_stco: //ISO/IEC 14496-12 Page 39. Section 8.19 - Chunk Offset Box.
+        case BOX_stco: // ISO/IEC 14496-12 Page 39. Section 8.19 - Chunk Offset Box.
         case BOX_co64:
             tr->chunk_count = READ(4);
             MALLOC(MP4D_file_offset_t *, tr->chunk_offset, tr->chunk_count * sizeof(MP4D_file_offset_t));
@@ -3201,7 +3210,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
                 unsigned int AVCProfileIndication = READ(1);
                 unsigned int profile_compatibility = READ(1);
                 unsigned int AVCLevelIndication = READ(1);
-                //bit(6) reserved =
+                // bit(6) reserved =
                 unsigned int lengthSizeMinusOne = READ(1) & 3;
 
                 (void)configurationVersion;
@@ -3253,7 +3262,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
             break;
         }
 
-        case OD_DCD:    //ISO/IEC 14496-1 Page 28. Section 8.6.5 - DecoderConfigDescriptor.
+        case OD_DCD:    // ISO/IEC 14496-1 Page 28. Section 8.6.5 - DecoderConfigDescriptor.
             assert(tr); // ensured by g_fullbox[] check
             tr->object_type_indication = READ(1);
 #if MP4D_INFO_SUPPORTED
@@ -3265,7 +3274,7 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
 #endif
             break;
 
-        case OD_DSI:    //ISO/IEC 14496-1 Page 28. Section 8.6.5 - DecoderConfigDescriptor.
+        case OD_DSI:    // ISO/IEC 14496-1 Page 28. Section 8.6.5 - DecoderConfigDescriptor.
             assert(tr); // ensured by g_fullbox[] check
             if (!tr->dsi && payload_bytes)
             {
@@ -3372,9 +3381,9 @@ int MP4D_open(MP4D_demux_t *mp4, int (*read_callback)(int64_t offset, void *buff
 }
 
 /**
-*   Find chunk, containing given sample.
-*   Returns chunk number, and first sample in this chunk.
-*/
+ *   Find chunk, containing given sample.
+ *   Returns chunk number, and first sample in this chunk.
+ */
 static int sample_to_chunk(MP4D_track_t *tr, unsigned nsample, unsigned *nfirst_sample_in_chunk)
 {
     unsigned chunk_group = 0, nc;
