@@ -1,6 +1,6 @@
 [package]
 name = "minimp4-sys"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["DarkSky"]
 edition = "2018"
 description = "A minimp4 ffi binding"
