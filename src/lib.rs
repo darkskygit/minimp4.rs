@@ -58,10 +58,14 @@ impl<W: Write + Seek> Mp4Muxer<W> {
     }
 
     pub fn write_video(&self, data: &[u8]) {
+        self.write_video_with_fps(data, 60)
+    }
+
+    pub fn write_video_with_fps(&self, data: &[u8], fps: u32) {
         unsafe {
             write_mp4(
                 self.muxer_writer,
-                60,
+                fps as c_int,
                 data.as_ptr() as *const c_void,
                 data.len().try_into().unwrap(),
             );
