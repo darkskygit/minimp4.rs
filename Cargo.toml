@@ -13,4 +13,5 @@ repository = "https://github.com/darkskygit/minimp4.rs"
 
 [dependencies]
 libc = "0.2.66"
-minimp4-sys = "0.1.0"
+minimp4-sys = {path = "minimp4-sys"}
+fdk-aac-sys = "0.4.0"

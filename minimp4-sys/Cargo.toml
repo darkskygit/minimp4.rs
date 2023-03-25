@@ -13,5 +13,5 @@ repository = "https://github.com/darkskygit/minimp4.rs"
 categories = ["external-ffi-bindings"]
 
 [build-dependencies]
-bindgen = "0.52.0"
-cc = "1.0.48"
+bindgen = "0.64.0"
+cc = { version = "1.0.79", features = ["parallel"] }
