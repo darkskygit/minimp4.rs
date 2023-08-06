@@ -1,17 +1,12 @@
-[package]
-name = "minimp4"
-version = "0.1.1"
-authors = ["DarkSky"]
-edition = "2021"
-description = "A minimp4 Rust binding"
-include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
-license = "AGPL-3.0-or-later"
-homepage = "https://github.com/darkskygit/minimp4.rs"
-readme = "README.md"
-keywords = ["minimp4", "mp4", "muxer", "h264", "h265"]
-repository = "https://github.com/darkskygit/minimp4.rs"
+[workspace]
+members = ["./packages/minimp4", "./packages/minimp4-sys"]
+resolver = "2"
 
-[dependencies]
-libc = "0.2.140"
-minimp4-sys = { path = "minimp4-sys" }
-fdk-aac-sys = "0.4.0"
+[workspace.dependencies]
+minimp4-sys = { workspace = true, path = "packages/minimp4-sys" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+strip = "symbols"

@@ -2,10 +2,10 @@
 name = "minimp4-sys"
 version = "0.1.1"
 authors = ["DarkSky"]
-edition = "2018"
+edition = "2021"
 description = "A minimp4 ffi binding"
 include = ["src/**/*", "build.rs", "minimp4.*", "Cargo.toml", "README.md", "LICENSE"]
-license = "AGPL-3.0-or-later"
+license = "MPL 2.0"
 homepage = "https://github.com/darkskygit/minimp4.rs"
 readme = "README.md"
 keywords = ["minimp4", "ffi", "bindings"]
@@ -13,5 +13,5 @@ repository = "https://github.com/darkskygit/minimp4.rs"
 categories = ["external-ffi-bindings"]
 
 [build-dependencies]
-bindgen = "0.64.0"
-cc = { version = "1.0.79", features = ["parallel"] }
+bindgen = "0.66.1"
+cc = { version = "1.0.81", features = ["parallel"] }

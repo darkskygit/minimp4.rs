@@ -1,0 +1,21 @@
+[package]
+name = "minimp4"
+version = "0.2.0"
+authors = ["DarkSky"]
+edition = "2021"
+description = "A minimp4 Rust binding"
+include = ["src/**/*", "Cargo.toml", "README.md", "LICENSE"]
+license = "MPL 2.0"
+homepage = "https://github.com/darkskygit/minimp4.rs"
+readme = "README.md"
+keywords = ["minimp4", "mp4", "muxer", "h264", "h265"]
+repository = "https://github.com/darkskygit/minimp4.rs"
+
+[features]
+default = ["aac"]
+aac = ["fdk-aac-sys"]
+
+[dependencies]
+libc = "0.2.140"
+minimp4-sys = { workspace = true }
+fdk-aac-sys = { version = "0.5.0", optional = true }
