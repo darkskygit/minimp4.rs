@@ -3,7 +3,7 @@ members  = ["./packages/minimp4", "./packages/minimp4-sys"]
 resolver = "2"
 
   [workspace.dependencies]
-  minimp4-sys = { workspace = true, path = "packages/minimp4-sys" }
+  minimp4-sys = { workspace = true, version = "0.1.1", path = "packages/minimp4-sys" }
 
 [profile.release]
 codegen-units = 1
