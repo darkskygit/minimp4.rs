@@ -1,12 +1,13 @@
+#[cfg(feature = "aac")]
 use std::{convert::TryInto, os::raw::c_void};
 
+use minimp4_sys::{mp4_h26x_write_nal, mp4_h26x_writer_t};
+#[cfg(feature = "aac")]
 use minimp4_sys::{
-    mp4_h26x_write_nal, mp4_h26x_writer_t, track_media_kind_t_e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi,
-    MP4E_track_t, MP4E_track_t__bindgen_ty_1, MP4E_track_t__bindgen_ty_1__bindgen_ty_1, MP4E_SAMPLE_RANDOM_ACCESS,
+    track_media_kind_t_e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi, MP4E_track_t,
+    MP4E_track_t__bindgen_ty_1, MP4E_track_t__bindgen_ty_1__bindgen_ty_1, MP4E_SAMPLE_RANDOM_ACCESS,
     MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3,
 };
-
-use super::enc::{Encoder, EncoderParams};
 
 fn get_nal_size(buf: &mut [u8], size: usize) -> usize {
     let mut pos = 3;
@@ -40,12 +41,13 @@ pub fn write_mp4(mp4wr: &mut mp4_h26x_writer_t, fps: i32, data: &[u8]) {
     }
 }
 
+#[cfg(feature = "aac")]
 pub fn write_mp4_with_audio(
     mp4wr: &mut mp4_h26x_writer_t,
     fps: i32,
     data: &[u8],
     pcm: &[u8],
-    encoder_params: EncoderParams,
+    encoder_params: super::enc::EncoderParams,
 ) {
     let mut data_size = data.len();
     let mut data_ptr = data.as_ptr();
@@ -53,7 +55,7 @@ pub fn write_mp4_with_audio(
     let sample_rate = encoder_params.sample_rate;
     let channel_count = encoder_params.channel_count;
 
-    let encoder = Encoder::new(encoder_params).unwrap();
+    let encoder = super::enc::Encoder::new(encoder_params).unwrap();
     let info = encoder.info().unwrap();
 
     let language: [u8; 4] = [0x75, 0x6e, 0x64, 0x00]; // und\0

@@ -1,3 +1,4 @@
+#[cfg(feature = "aac")]
 pub mod enc;
 mod writer;
 
@@ -11,16 +12,20 @@ use std::{
     slice::from_raw_parts,
 };
 
+#[cfg(feature = "aac")]
 use enc::{BitRate, EncoderParams};
 use libc::malloc;
 use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open, MP4E_set_text_comment};
-use writer::{write_mp4, write_mp4_with_audio};
+use writer::write_mp4;
+#[cfg(feature = "aac")]
+use writer::write_mp4_with_audio;
 
 pub struct Mp4Muxer<W> {
     writer: W,
     muxer: *mut MP4E_mux_t,
     muxer_writer: *mut mp4_h26x_writer_t,
     str_buffer: Vec<CString>,
+    #[cfg(feature = "aac")]
     encoder_params: Option<EncoderParams>,
 }
 
@@ -32,6 +37,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
                 muxer: null_mut(),
                 muxer_writer: malloc(size_of::<mp4_h26x_writer_t>()) as *mut mp4_h26x_writer_t,
                 str_buffer: Vec::new(),
+                #[cfg(feature = "aac")]
                 encoder_params: None,
             }
         }
@@ -54,6 +60,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         }
     }
 
+    #[cfg(feature = "aac")]
     pub fn init_audio(&mut self, bit_rate: u32, sample_rate: u32, channel_count: u32) {
         self.encoder_params = Some(EncoderParams {
             bit_rate: BitRate::Cbr(bit_rate),
@@ -66,6 +73,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         self.write_video_with_fps(data, 60);
     }
 
+    #[cfg(feature = "aac")]
     pub fn write_video_with_audio(&self, data: &[u8], fps: u32, pcm: &[u8]) {
         assert!(self.encoder_params.is_some());
         let mp4wr = unsafe { self.muxer_writer.as_mut().unwrap() };
@@ -124,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "aac")]
     #[ignore = "not complete yet, some platform cannot link fdk-aac"]
     fn test_mux_h264_audio() {
         let mut buffer = Cursor::new(vec![]);
