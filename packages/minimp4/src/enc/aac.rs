@@ -1,15 +1,16 @@
-use std::cmp;
-use std::fmt::{self, Display, Debug};
-use std::mem::{self, MaybeUninit};
-use std::os::raw::{c_void, c_uint, c_int};
-use std::ptr;
+use std::{
+    cmp,
+    fmt::{self, Debug, Display},
+    mem::{self, MaybeUninit},
+    os::raw::{c_int, c_uint, c_void},
+    ptr,
+};
 
 use fdk_aac_sys as sys;
-
 pub use sys::AACENC_InfoStruct as InfoStruct;
 
 //mostly from https://github.com/haileys/fdk-aac-rs but with some changes
- 
+
 pub struct EncoderError(sys::AACENC_ERROR);
 
 impl EncoderError {
@@ -35,7 +36,12 @@ impl EncoderError {
 
 impl Debug for EncoderError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "EncoderError {{ code: {:?}, message: {:?} }}", self.0 as c_int, self.message())
+        write!(
+            f,
+            "EncoderError {{ code: {:?}, message: {:?} }}",
+            self.0 as c_int,
+            self.message()
+        )
     }
 }
 
@@ -60,16 +66,16 @@ struct EncoderHandle {
 impl EncoderHandle {
     pub fn alloc(max_modules: usize, max_channels: usize) -> Result<Self, EncoderError> {
         let mut ptr: sys::HANDLE_AACENCODER = ptr::null_mut();
-        check(unsafe {
-            sys::aacEncOpen(&mut ptr as *mut _, max_modules as c_uint, max_channels as c_uint)
-        })?;
+        check(unsafe { sys::aacEncOpen(&mut ptr as *mut _, max_modules as c_uint, max_channels as c_uint) })?;
         Ok(EncoderHandle { ptr })
     }
 }
 
 impl Drop for EncoderHandle {
     fn drop(&mut self) {
-        unsafe { sys::aacEncClose(&mut self.ptr as *mut _); }
+        unsafe {
+            sys::aacEncClose(&mut self.ptr as *mut _);
+        }
     }
 }
 
@@ -87,7 +93,7 @@ pub enum BitRate {
 pub struct EncoderParams {
     pub bit_rate: BitRate,
     pub sample_rate: u32,
-    pub channel_count: u32
+    pub channel_count: u32,
 }
 
 pub struct Encoder {
@@ -116,7 +122,11 @@ impl Encoder {
 
             let bitrate_mode = match params.bit_rate {
                 BitRate::Cbr(bitrate) => {
-                    check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_BITRATE, bitrate))?;
+                    check(sys::aacEncoder_SetParam(
+                        handle.ptr,
+                        sys::AACENC_PARAM_AACENC_BITRATE,
+                        bitrate,
+                    ))?;
                     0
                 }
                 BitRate::VbrVeryLow => 1,
@@ -126,19 +136,45 @@ impl Encoder {
                 BitRate::VbrVeryHigh => 5,
             };
 
-            check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_BITRATEMODE, bitrate_mode))?;
+            check(sys::aacEncoder_SetParam(
+                handle.ptr,
+                sys::AACENC_PARAM_AACENC_BITRATEMODE,
+                bitrate_mode,
+            ))?;
 
-            check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_SAMPLERATE, params.sample_rate))?;
+            check(sys::aacEncoder_SetParam(
+                handle.ptr,
+                sys::AACENC_PARAM_AACENC_SAMPLERATE,
+                params.sample_rate,
+            ))?;
 
-            check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_TRANSMUX, 0))?;
+            check(sys::aacEncoder_SetParam(
+                handle.ptr,
+                sys::AACENC_PARAM_AACENC_TRANSMUX,
+                0,
+            ))?;
 
             // hardcode SBR off for now
-            check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_SBR_MODE, 0))?;
+            check(sys::aacEncoder_SetParam(
+                handle.ptr,
+                sys::AACENC_PARAM_AACENC_SBR_MODE,
+                0,
+            ))?;
 
-            check(sys::aacEncoder_SetParam(handle.ptr, sys::AACENC_PARAM_AACENC_CHANNELMODE, params.channel_count))?;
+            check(sys::aacEncoder_SetParam(
+                handle.ptr,
+                sys::AACENC_PARAM_AACENC_CHANNELMODE,
+                params.channel_count,
+            ))?;
 
             // call encode once with all null params according to docs
-            check(sys::aacEncEncode(handle.ptr, ptr::null(), ptr::null(), ptr::null(), ptr::null_mut()))?;
+            check(sys::aacEncEncode(
+                handle.ptr,
+                ptr::null(),
+                ptr::null(),
+                ptr::null(),
+                ptr::null_mut(),
+            ))?;
         }
 
         Ok(Encoder { handle })

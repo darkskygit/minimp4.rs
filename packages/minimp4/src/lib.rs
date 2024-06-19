@@ -1,12 +1,6 @@
 pub mod enc;
 mod writer;
 
-use enc::{BitRate, EncoderParams};
-use libc::malloc;
-use minimp4_sys::{
-    mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open,
-    MP4E_set_text_comment,
-};
 use std::{
     convert::TryInto,
     ffi::CString,
@@ -16,6 +10,10 @@ use std::{
     ptr::null_mut,
     slice::from_raw_parts,
 };
+
+use enc::{BitRate, EncoderParams};
+use libc::malloc;
+use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open, MP4E_set_text_comment};
 use writer::{write_mp4, write_mp4_with_audio};
 
 pub struct Mp4Muxer<W> {
@@ -100,12 +98,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         self.writer.write(buf).unwrap_or(0)
     }
 
-    extern "C" fn write(
-        offset: i64,
-        buffer: *const c_void,
-        size: usize,
-        token: *mut c_void,
-    ) -> i32 {
+    extern "C" fn write(offset: i64, buffer: *const c_void, size: usize, token: *mut c_void) -> i32 {
         let p_self = token as *mut Self;
         unsafe {
             let buf = from_raw_parts(buffer as *const u8, size);
@@ -116,9 +109,9 @@ impl<W: Write + Seek> Mp4Muxer<W> {
 
 #[cfg(test)]
 mod tests {
+    use std::{io::Cursor, path::Path};
+
     use super::*;
-    use std::io::Cursor;
-    use std::path::Path;
 
     #[test]
     fn test_muxer() {
@@ -142,11 +135,7 @@ mod tests {
         mp4muxer.write_comment("test comment");
         mp4muxer.close();
         // write with audio has not stable output, need to be check later
-        std::fs::write(
-            Path::new("./src/fixtures/h264_output.mp4"),
-            buffer.into_inner(),
-        )
-        .unwrap();
+        std::fs::write(Path::new("./src/fixtures/h264_output.mp4"), buffer.into_inner()).unwrap();
     }
 
     #[test]

@@ -1,11 +1,10 @@
+use std::{convert::TryInto, os::raw::c_void};
+
 use minimp4_sys::{
-    mp4_h26x_write_nal, mp4_h26x_writer_t, track_media_kind_t_e_audio, MP4E_add_track,
-    MP4E_put_sample, MP4E_set_dsi, MP4E_track_t, MP4E_track_t__bindgen_ty_1,
-    MP4E_track_t__bindgen_ty_1__bindgen_ty_1, MP4E_SAMPLE_RANDOM_ACCESS,
+    mp4_h26x_write_nal, mp4_h26x_writer_t, track_media_kind_t_e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi,
+    MP4E_track_t, MP4E_track_t__bindgen_ty_1, MP4E_track_t__bindgen_ty_1__bindgen_ty_1, MP4E_SAMPLE_RANDOM_ACCESS,
     MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3,
 };
-use std::convert::TryInto;
-use std::os::raw::c_void;
 
 use super::enc::{Encoder, EncoderParams};
 
@@ -113,9 +112,8 @@ pub fn write_mp4_with_audio(
         while ats < ts {
             let bytes_to_read = std::cmp::min(total_samples, in_args_num_in_samples);
             let bytes_read = bytes_to_read * 2; // 2 bytes per i16
-            let pcm_buf = unsafe {
-                std::slice::from_raw_parts(pcm_ptr as *const i16, bytes_to_read.try_into().unwrap())
-            };
+            let pcm_buf =
+                unsafe { std::slice::from_raw_parts(pcm_ptr as *const i16, bytes_to_read.try_into().unwrap()) };
             // Copy PCM data into input buffer
             input_buffer[..bytes_to_read as usize].copy_from_slice(pcm_buf);
             pcm_ptr = unsafe { pcm_ptr.add(bytes_read.try_into().unwrap()) };
