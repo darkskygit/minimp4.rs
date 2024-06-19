@@ -117,7 +117,7 @@ impl<W: Write + Seek> Mp4Muxer<W> {
 
 #[cfg(test)]
 mod tests {
-    use std::{io::Cursor, path::Path};
+    use std::io::Cursor;
 
     use super::*;
 
@@ -135,6 +135,7 @@ mod tests {
     #[cfg(feature = "aac")]
     #[ignore = "not complete yet, some platform cannot link fdk-aac"]
     fn test_mux_h264_audio() {
+        use std::{fs::write, path::Path};
         let mut buffer = Cursor::new(vec![]);
         let mut mp4muxer = Mp4Muxer::new(&mut buffer);
         let h264 = include_bytes!("./fixtures/input.264");
@@ -145,7 +146,7 @@ mod tests {
         mp4muxer.write_comment("test comment");
         mp4muxer.close();
         // write with audio has not stable output, need to be check later
-        std::fs::write(Path::new("./src/fixtures/h264_output.tmp"), buffer.into_inner()).unwrap();
+        write(Path::new("./src/fixtures/h264_output.tmp"), buffer.into_inner()).unwrap();
     }
 
     #[test]
