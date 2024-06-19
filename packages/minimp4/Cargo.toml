@@ -16,6 +16,6 @@ default = ["aac"]
 aac = ["fdk-aac-sys"]
 
 [dependencies]
-libc = "0.2.140"
+libc = "0.2.155"
 minimp4-sys = { workspace = true }
 fdk-aac-sys = { version = "0.5.0", optional = true }
