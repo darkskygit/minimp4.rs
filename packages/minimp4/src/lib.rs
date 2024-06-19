@@ -141,6 +141,7 @@ mod tests {
         mp4muxer.write_video_with_audio(h264, 25, pcm);
         mp4muxer.write_comment("test comment");
         mp4muxer.close();
+        // write with audio has not stable output, need to be check later
         std::fs::write(
             Path::new("./src/fixtures/h264_output.mp4"),
             buffer.into_inner(),
@@ -149,7 +150,20 @@ mod tests {
     }
 
     #[test]
-    fn test_mux_h265_audio() {
+    fn test_mux_h264() {
+        let mut buffer = Cursor::new(vec![]);
+        let mut mp4muxer = Mp4Muxer::new(&mut buffer);
+        let h264 = include_bytes!("./fixtures/input.264");
+        mp4muxer.init_video(1280, 720, false, "h264 stream");
+        mp4muxer.write_video_with_fps(h264, 25);
+        mp4muxer.write_comment("test comment");
+        mp4muxer.close();
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer, include_bytes!("./fixtures/h264_output.mp4"));
+    }
+
+    #[test]
+    fn test_mux_h265() {
         let mut buffer = Cursor::new(vec![]);
         let mut mp4muxer = Mp4Muxer::new(&mut buffer);
         let h265 = include_bytes!("./fixtures/input.265");
@@ -157,9 +171,7 @@ mod tests {
         mp4muxer.write_video_with_fps(h265, 25);
         mp4muxer.write_comment("test comment");
         mp4muxer.close();
-        assert_eq!(
-            buffer.into_inner(),
-            include_bytes!("./fixtures/h265_output.mp4")
-        );
+        let buffer = buffer.into_inner();
+        assert_eq!(buffer, include_bytes!("./fixtures/h265_output.mp4"));
     }
 }
