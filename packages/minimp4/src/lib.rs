@@ -124,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "not complete yet, some platform cannot link fdk-aac"]
     fn test_mux_h264_audio() {
         let mut buffer = Cursor::new(vec![]);
         let mut mp4muxer = Mp4Muxer::new(&mut buffer);
@@ -135,7 +136,7 @@ mod tests {
         mp4muxer.write_comment("test comment");
         mp4muxer.close();
         // write with audio has not stable output, need to be check later
-        std::fs::write(Path::new("./src/fixtures/h264_output.mp4"), buffer.into_inner()).unwrap();
+        std::fs::write(Path::new("./src/fixtures/h264_output.tmp"), buffer.into_inner()).unwrap();
     }
 
     #[test]

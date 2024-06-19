@@ -42,9 +42,8 @@ jobs:
 
             - name: Build & Check
               run: |
-                  cargo vendor > .cargo/config
                   cargo clippy --all-features --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
-                  RUSTDOCFLAGS="-D rustdoc::broken-intra-doc-links" cargo doc --workspace --all-features --no-deps
+                  RUSTDOCFLAGS="-D rustdoc::broken-intra-doc-links" cargo doc --workspace --exclude minimp4-sys --all-features --no-deps
               env:
                   CARGO_TERM_COLOR: always
 
@@ -71,4 +70,4 @@ jobs:
             - name: Install latest nextest release
               uses: taiki-e/install-action@nextest
             - name: Run tests
-              run: cargo nextest run -p jwst-codec --lib
+              run: cargo nextest run
