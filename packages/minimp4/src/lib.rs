@@ -1,3 +1,4 @@
+mod c;
 #[cfg(feature = "aac")]
 pub mod enc;
 mod writer;
@@ -12,10 +13,10 @@ use std::{
     slice::from_raw_parts,
 };
 
+use c::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open, MP4E_set_text_comment};
 #[cfg(feature = "aac")]
 use enc::{BitRate, EncoderParams};
 use libc::malloc;
-use minimp4_sys::{mp4_h26x_write_init, mp4_h26x_writer_t, MP4E_close, MP4E_mux_t, MP4E_open, MP4E_set_text_comment};
 use writer::write_mp4;
 #[cfg(feature = "aac")]
 use writer::write_mp4_with_audio;
@@ -101,15 +102,15 @@ impl<W: Write + Seek> Mp4Muxer<W> {
         &self.writer
     }
 
-    pub fn write_data(&mut self, offset: i64, buf: &[u8]) -> usize {
+    pub fn write_data(&mut self, offset: i64, buf: &[u8]) -> u64 {
         self.writer.seek(SeekFrom::Start(offset as u64)).unwrap();
-        self.writer.write(buf).unwrap_or(0)
+        self.writer.write(buf).unwrap_or(0) as u64
     }
 
-    extern "C" fn write(offset: i64, buffer: *const c_void, size: usize, token: *mut c_void) -> i32 {
+    extern "C" fn write(offset: i64, buffer: *const c_void, size: u64, token: *mut c_void) -> i32 {
         let p_self = token as *mut Self;
         unsafe {
-            let buf = from_raw_parts(buffer as *const u8, size);
+            let buf = from_raw_parts(buffer as *const u8, size as usize);
             ((*p_self).write_data(offset, buf) != size) as i32
         }
     }

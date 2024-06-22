@@ -1,7 +1,7 @@
 #[cfg(feature = "aac")]
 use std::{convert::TryInto, os::raw::c_void};
 
-use minimp4_sys::{mp4_h26x_write_nal, mp4_h26x_writer_t};
+use super::c::{mp4_h26x_write_nal, mp4_h26x_writer_t};
 #[cfg(feature = "aac")]
 use minimp4_sys::{
     track_media_kind_t_e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi, MP4E_track_t,

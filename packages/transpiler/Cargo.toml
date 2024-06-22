@@ -1,0 +1,10 @@
+[package]
+name = "transpiler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]

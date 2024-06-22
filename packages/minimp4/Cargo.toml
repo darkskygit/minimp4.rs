@@ -9,13 +9,13 @@ license     = "MPL-2.0"
 name        = "minimp4"
 readme      = "README.md"
 repository  = "https://github.com/darkskygit/minimp4.rs"
-version     = "0.1.2"
+version     = "0.2.0"
 
 [features]
 aac     = ["fdk-aac-sys"]
-default = []
+default = ["libc"]
+libc    = ["dep:libc"]
 
 [dependencies]
 fdk-aac-sys = { version = "0.5.0", optional = true }
-libc        = "0.2.155"
-minimp4-sys = { workspace = true }
+libc        = { version = "0.2.155", optional = true }
