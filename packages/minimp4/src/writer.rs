@@ -1,13 +1,4 @@
-#[cfg(feature = "aac")]
-use std::{convert::TryInto, os::raw::c_void};
-
 use super::c::{mp4_h26x_write_nal, mp4_h26x_writer_t};
-#[cfg(feature = "aac")]
-use minimp4_sys::{
-    track_media_kind_t_e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi, MP4E_track_t,
-    MP4E_track_t__bindgen_ty_1, MP4E_track_t__bindgen_ty_1__bindgen_ty_1, MP4E_SAMPLE_RANDOM_ACCESS,
-    MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3,
-};
 
 fn get_nal_size(buf: &mut [u8], size: usize) -> usize {
     let mut pos = 3;
@@ -49,6 +40,11 @@ pub fn write_mp4_with_audio(
     pcm: &[u8],
     encoder_params: super::enc::EncoderParams,
 ) {
+    use super::c::{
+        c_void, e_audio, MP4E_add_track, MP4E_put_sample, MP4E_set_dsi, MP4E_track_t, MP4E_track_t_AVConfig,
+        MP4E_track_t_AVConfig_AudioConfig, MP4E_SAMPLE_RANDOM_ACCESS, MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3,
+    };
+
     let mut data_size = data.len();
     let mut data_ptr = data.as_ptr();
 
@@ -62,11 +58,11 @@ pub fn write_mp4_with_audio(
     let tr: MP4E_track_t = MP4E_track_t {
         object_type_indication: MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3,
         language,
-        track_media_kind: track_media_kind_t_e_audio,
+        track_media_kind: e_audio,
         time_scale: 90000,
         default_duration: 0,
-        u: MP4E_track_t__bindgen_ty_1 {
-            a: MP4E_track_t__bindgen_ty_1__bindgen_ty_1 {
+        u: MP4E_track_t_AVConfig {
+            a: MP4E_track_t_AVConfig_AudioConfig {
                 channelcount: channel_count,
             },
         },

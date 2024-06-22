@@ -65,25 +65,63 @@ pub struct MP4E_track_t {
     pub track_media_kind: track_media_kind_t,
     pub time_scale: c_uint,
     pub default_duration: c_uint,
-    pub u: C2RustUnnamed,
+    pub u: MP4E_track_t_AVConfig,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub union C2RustUnnamed {
-    pub a: C2RustUnnamed_1,
-    pub v: C2RustUnnamed_0,
+pub union MP4E_track_t_AVConfig {
+    pub a: MP4E_track_t_AVConfig_AudioConfig,
+    pub v: MP4E_track_t_AVConfig_VideoConfig,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_0 {
+pub struct MP4E_track_t_AVConfig_VideoConfig {
     pub width: c_int,
     pub height: c_int,
 }
 #[derive(Copy, Clone)]
 #[repr(C)]
-pub struct C2RustUnnamed_1 {
+pub struct MP4E_track_t_AVConfig_AudioConfig {
     pub channelcount: c_uint,
 }
+
+/*********************************************************************** */
+/* Some values of MP4(E/D)_track_t->object_type_indication */
+/*********************************************************************** */
+/// MPEG-4 AAC (all profiles)
+pub const MP4_OBJECT_TYPE_AUDIO_ISO_IEC_14496_3: c_uint = 0x40;
+/// MPEG-2 AAC, Main profile
+pub const MP4_OBJECT_TYPE_AUDIO_ISO_IEC_13818_7_MAIN_PROFILE: c_uint = 0x66;
+/// MPEG-2 AAC, LC profile
+pub const MP4_OBJECT_TYPE_AUDIO_ISO_IEC_13818_7_LC_PROFILE: c_uint = 0x67;
+/// MPEG-2 AAC, SSR profile
+pub const MP4_OBJECT_TYPE_AUDIO_ISO_IEC_13818_7_SSR_PROFILE: c_uint = 0x68;
+/// H.264 (AVC) video
+pub const MP4_OBJECT_TYPE_AVC: c_uint = 0x21;
+/// H.265 (HEVC) video
+pub const MP4_OBJECT_TYPE_HEVC: c_uint = 0x23;
+/// http://www.mp4ra.org/object.html 0xC0-E0  && 0xE2 - 0xFE are specified as "user private"
+pub const MP4_OBJECT_TYPE_USER_PRIVATE: c_uint = 0xC0;
+
+/*********************************************************************** */
+/* API error codes */
+/*********************************************************************** */
+pub const MP4E_STATUS_OK: c_int = 0;
+pub const MP4E_STATUS_BAD_ARGUMENTS: c_int = -1;
+pub const MP4E_STATUS_NO_MEMORY: c_int = -2;
+pub const MP4E_STATUS_FILE_WRITE_ERROR: c_int = -3;
+pub const MP4E_STATUS_ONLY_ONE_DSI_ALLOWED: c_int = -4;
+
+/*********************************************************************** */
+/* Sample kind for MP4E_put_sample() */
+/*********************************************************************** */
+/// (beginning of) audio or video frame
+pub const MP4E_SAMPLE_DEFAULT: c_uint = 0;
+/// mark sample as random access point (key frame)
+pub const MP4E_SAMPLE_RANDOM_ACCESS: c_uint = 1;
+/// Not a sample, but continuation of previous sample (new slice)
+pub const MP4E_SAMPLE_CONTINUATION: c_uint = 2;
+
 #[derive(Copy, Clone)]
 #[repr(C)]
 pub struct MP4D_sample_to_chunk_t_tag {
@@ -5440,8 +5478,8 @@ pub unsafe extern "C" fn mp4_h26x_write_init(
         track_media_kind: e_audio,
         time_scale: 0,
         default_duration: 0,
-        u: C2RustUnnamed {
-            a: C2RustUnnamed_1 { channelcount: 0 },
+        u: MP4E_track_t_AVConfig {
+            a: MP4E_track_t_AVConfig_AudioConfig { channelcount: 0 },
         },
     };
     tr.track_media_kind = e_video;
